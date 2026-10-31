@@ -1,0 +1,48 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/moon-manifest"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/moon_config",
+}
+
+// Values
+pub fn parse(Kind, String, path? : String) -> Document
+
+// Errors
+
+// Types and methods
+pub struct Diagnostic {
+  message : String
+  start : Int32
+  end : Int32
+} derive(Eq, @debug.Debug)
+
+pub struct Document {
+  kind : Kind
+  path : String
+  source : Bytes
+  ast : @moon_config.Ast
+  diagnostics : Array[Diagnostic]
+} derive(@debug.Debug)
+pub fn Document::dependency_version(Self, String) -> String?
+pub fn Document::find_string(Self, String) -> Span?
+pub fn Document::members(Self) -> Array[String]
+pub fn Document::module_name(Self) -> String?
+pub fn Document::replace_string(Self, String, String) -> String
+pub fn Document::version(Self) -> String?
+
+pub(all) enum Kind {
+  Mod
+  Pkg
+  Work
+} derive(Eq, @debug.Debug)
+
+pub struct Span {
+  start : Int32
+  end : Int32
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

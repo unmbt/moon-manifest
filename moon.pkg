@@ -1,0 +1,5 @@
+import {
+  "moonbitlang/moon_config",
+  "moonbitlang/lexer/basic",
+  "moonbitlang/core/encoding/utf8",
+}

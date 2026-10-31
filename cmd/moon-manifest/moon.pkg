@@ -1,0 +1,10 @@
+import {
+  "unmbt/moon-manifest" @manifest,
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"
