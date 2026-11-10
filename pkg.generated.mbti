@@ -3,7 +3,6 @@ package "unmbt/moon-manifest"
 
 import {
   "moonbitlang/core/debug",
-  "moonbitlang/moon_config",
 }
 
 // Values
@@ -12,36 +11,74 @@ pub fn parse(Kind, String, path? : String) -> Document
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
+pub struct Dependency {
+  name : String
+  version : String
+  span : Span
+}
+pub fn Dependency::equal(Self, Self) -> Bool
+pub fn Dependency::not_equal(Self, Self) -> Bool
+pub fn Dependency::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
 pub struct Diagnostic {
   message : String
   start : Int32
   end : Int32
-} derive(Eq, @debug.Debug)
+}
+pub fn Diagnostic::equal(Self, Self) -> Bool
+pub fn Diagnostic::not_equal(Self, Self) -> Bool
+pub fn Diagnostic::to_repr(Self) -> @debug.Repr
 
+#derive(@debug.Debug)
 pub struct Document {
   kind : Kind
   path : String
   source : Bytes
-  ast : @moon_config.Ast
   diagnostics : Array[Diagnostic]
-} derive(@debug.Debug)
+  // private fields
+}
+pub fn Document::dependencies(Self) -> Array[Dependency]
 pub fn Document::dependency_version(Self, String) -> String?
+pub fn Document::field_span(Self, String) -> Span?
 pub fn Document::find_string(Self, String) -> Span?
+pub fn Document::is_private(Self) -> Bool
+pub fn Document::member_entries(Self) -> Array[LocatedString]
 pub fn Document::members(Self) -> Array[String]
 pub fn Document::module_name(Self) -> String?
 pub fn Document::replace_string(Self, String, String) -> String
+pub fn Document::string_field(Self, String) -> LocatedString?
+pub fn Document::to_repr(Self) -> @debug.Repr
 pub fn Document::version(Self) -> String?
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Kind {
   Mod
   Pkg
   Work
-} derive(Eq, @debug.Debug)
+}
+pub fn Kind::equal(Self, Self) -> Bool
+pub fn Kind::not_equal(Self, Self) -> Bool
+pub fn Kind::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
+pub struct LocatedString {
+  value : String
+  span : Span
+}
+pub fn LocatedString::equal(Self, Self) -> Bool
+pub fn LocatedString::not_equal(Self, Self) -> Bool
+pub fn LocatedString::to_repr(Self) -> @debug.Repr
+
+#derive(Eq, @debug.Debug)
 pub struct Span {
   start : Int32
   end : Int32
-} derive(Eq, @debug.Debug)
+}
+pub fn Span::equal(Self, Self) -> Bool
+pub fn Span::not_equal(Self, Self) -> Bool
+pub fn Span::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

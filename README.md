@@ -38,6 +38,16 @@ byte span for a scalar string; and `Document::replace_string` performs a
 lossless replacement. `Document::diagnostics` exposes parser diagnostics with
 byte offsets into the original UTF-8 source.
 
+The 0.2 alpha adds AST-scoped `string_field`, `field_span`,
+`member_entries`, `dependencies`, and `is_private` queries. Located values
+refer to complete literals in the original UTF-8 bytes (including quotes).
+Import spans cover the whole `name@version` literal. Duplicate imports and
+unsupported module import aliases/kinds are diagnosed instead of omitted.
+BOM and CRLF input are preserved. `is_private` describes registry visibility,
+not an npm-style prohibition on publishing.
+
+The CLI uses `moonbitlang/core/async`; the library itself has no async dependency.
+
 ## Supported files and targets
 
 `Kind::Mod`, `Kind::Pkg`, and `Kind::Work` correspond to the three MoonBit

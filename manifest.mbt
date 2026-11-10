@@ -1,35 +1,39 @@
 ///|
 /// A supported MoonBit configuration file.
+#derive(Eq, Debug)
 pub(all) enum Kind {
   Mod
   Pkg
   Work
-} derive(Eq, Debug)
+}
 
 ///|
 /// A diagnostic reported by moon_config or by the lossless edit layer.
+#derive(Eq, Debug)
 pub struct Diagnostic {
-  pub message : String
-  pub start : Int32
-  pub end : Int32
-} derive(Eq, Debug)
+  message : String
+  start : Int32
+  end : Int32
+}
 
 ///|
 /// A byte range in the original UTF-8 source.
+#derive(Eq, Debug)
 pub struct Span {
-  pub start : Int32
-  pub end : Int32
-} derive(Eq, Debug)
+  start : Int32
+  end : Int32
+}
 
 ///|
 /// A parsed manifest. source is retained byte-for-byte for stale-plan checks.
+#derive(Debug)
 pub struct Document {
-  pub kind : Kind
-  pub path : String
-  pub source : Bytes
-  ast : @moon_config.Ast
-  pub diagnostics : Array[Diagnostic]
-} derive(Debug)
+  kind : Kind
+  path : String
+  source : Bytes
+  priv ast : @moon_config.Ast
+  diagnostics : Array[Diagnostic]
+}
 
 ///|
 pub fn parse(
@@ -37,10 +41,15 @@ pub fn parse(
   source : String,
   path~ : String = "moon.mod",
 ) -> Document {
+  let input = if source.has_prefix("\uFEFF") {
+    " " + source[1:].to_owned()
+  } else {
+    source
+  }
   let (ast, reports) = match kind {
-    Mod => @moon_config.parse_moon_mod(name=path, source)
-    Pkg => @moon_config.parse_moon_pkg(name=path, source)
-    Work => @moon_config.parse_moon_work(name=path, source)
+    Mod => @moon_config.parse_moon_mod(name=path, input)
+    Pkg => @moon_config.parse_moon_pkg(name=path, input)
+    Work => @moon_config.parse_moon_work(name=path, input)
   }
   let diagnostics : Array[Diagnostic] = []
   for report in reports {
@@ -49,6 +58,9 @@ pub fn parse(
       start: position_to_byte(source, report.loc.start),
       end: position_to_byte(source, report.loc.end),
     })
+  }
+  if kind == Mod {
+    diagnostics.append(validate_imports(input, source, path))
   }
   { kind, path, source: @utf8.encode(source), ast, diagnostics, }
 }
@@ -142,12 +154,12 @@ pub fn Document::members(self : Document) -> Array[String] {
 ///|
 pub fn Document::dependency_version(
   self : Document,
-  module : String,
+  dependency : String,
 ) -> String? {
   for (key, value) in fields(self.ast) {
     if key == "deps" {
       for (dep, version) in fields(value) {
-        if dep == module {
+        if dep == dependency {
           return string_value(version)
         }
       }

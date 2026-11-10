@@ -6,7 +6,7 @@ async fn main {
       "usage: moon-manifest version <moon.mod> | generate-version <moon.mod> <output.mbt> [server_version]",
     )
   }
-  let source = @fs.read_file(path).text()
+  let source = @fs.read_text(path)
   let document = @manifest.parse(@manifest.Mod, source, path~)
   guard document.diagnostics.is_empty() else {
     fail(document.diagnostics[0].message)
@@ -32,8 +32,8 @@ async fn main {
       declaration +
       Json::string(version).stringify() +
       "\n"
-    if !@fs.exists(output) || @fs.read_file(output).text() != generated {
-      @fs.write_file(output, generated)
+    if !@fs.exists(output) || @fs.read_text(output) != generated {
+      @fs.write_text(output, generated)
     }
   } else {
     fail("unknown command: " + command)
