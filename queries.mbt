@@ -130,3 +130,27 @@ fn validate_imports(
   }
   diagnostics
 }
+
+///|
+fn Document::validate_shapes(self : Document) -> Unit {
+  for (key, value) in fields(self.ast) {
+    let valid = match (self.kind, key) {
+      (Mod, "name" | "version" | "source") => value is @moon_config.Str(_, ..)
+      (Work, "members") =>
+        match value {
+          @moon_config.Arr(items, ..) =>
+            items.to_array().all(item => item is @moon_config.Str(_, ..))
+          _ => false
+        }
+      _ => true
+    }
+    if !valid {
+      let span = self.span(value)
+      self.diagnostics.push({
+        message: "Invalid value type for `" + key + "`",
+        start: span.start,
+        end: span.end,
+      })
+    }
+  }
+}

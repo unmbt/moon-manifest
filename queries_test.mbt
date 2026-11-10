@@ -50,3 +50,13 @@ test "BOM and same-line Unicode preserve byte spans" {
   )
   assert_eq(@utf8.decode_lossy(doc.source), source)
 }
+
+///|
+test "wrong scalar and member types cannot disappear from read models" {
+  for source in ["name = 42", "version = false", "source = []"] {
+    assert_true(!@moon-manifest.parse(Mod, source).diagnostics.is_empty())
+  }
+  for source in ["members = 42", "members = [\"a\", 42]"] {
+    assert_true(!@moon-manifest.parse(Work, source).diagnostics.is_empty())
+  }
+}

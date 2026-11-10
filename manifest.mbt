@@ -62,7 +62,9 @@ pub fn parse(
   if kind == Mod {
     diagnostics.append(validate_imports(input, source, path))
   }
-  { kind, path, source: @utf8.encode(source), ast, diagnostics, }
+  let document = { kind, path, source: @utf8.encode(source), ast, diagnostics, }
+  document.validate_shapes()
+  document
 }
 
 ///|

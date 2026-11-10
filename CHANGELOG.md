@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0-alpha.2
+
+- Diagnose non-string module fields and malformed workspace member arrays instead of treating them as absent.
+
 ## 0.2.0-alpha.1
 
 - Add AST-scoped located fields, members and dependency enumeration for workspace tooling.
