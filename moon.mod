@@ -1,6 +1,6 @@
 name = "unmbt/moon-manifest"
 
-version = "0.2.0-alpha.2"
+version = "0.2.0"
 
 readme = "README.md"
 
