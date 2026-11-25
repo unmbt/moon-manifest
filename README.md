@@ -6,7 +6,7 @@ Lossless readers and editors for MoonBit `moon.mod`, `moon.pkg`, and
 The package is used by MoonBit release and dependency tools that need to
 inspect or update a manifest without reformatting it. Parsing is delegated to
 [`moonbitlang/moon_config`](https://mooncakes.io/docs/moonbitlang/moon_config),
-while edits replace only the selected string value and preserve comments,
+while edits replace only the selected byte spans and preserve comments,
 whitespace, line endings, and unrelated fields.
 
 ## Install
@@ -15,44 +15,52 @@ whitespace, line endings, and unrelated fields.
 moon add unmbt/moon-manifest
 ```
 
-Then import the package from MoonBit:
+Then import the package in `moon.pkg`:
 
 ```moonbit
-import "unmbt/moon-manifest"
+import {
+  "unmbt/moon-manifest",
+}
 ```
 
 ## Example
 
 ```moonbit
-let document = @manifest.parse(
-  @manifest.Kind::Mod,
+let document = @moon-manifest.parse(
+  Mod,
   "name = \"example/app\"\nversion = \"0.1.0\"\n",
 )
 let name = document.module_name()
 let updated = document.replace_string("version", "0.2.0")
 ```
 
-`Document::dependency_version` reads a dependency from a parsed manifest;
-`Document::members` reads workspace members; `Document::find_string` returns a
-byte span for a scalar string; and `Document::replace_string` performs a
-lossless replacement. `Document::diagnostics` exposes parser diagnostics with
-byte offsets into the original UTF-8 source.
+Multi-span lossless edits:
 
-The 0.2 alpha adds AST-scoped `string_field`, `field_span`,
-`member_entries`, `dependencies`, and `is_private` queries. Located values
-refer to complete literals in the original UTF-8 bytes (including quotes).
-Import spans cover the whole `name@version` literal. Duplicate imports and
-unsupported module import aliases/kinds are diagnosed instead of omitted.
-BOM and CRLF input are preserved. `is_private` describes registry visibility,
-not an npm-style prohibition on publishing.
+```moonbit
+let version_span = document.string_field("version").unwrap().span
+let edited_bytes = document.apply_edits([
+  { span: version_span, replacement: "\"0.2.0\"" },
+])
+```
 
-The CLI uses `moonbitlang/core/async`; the library itself has no async dependency.
+- `Document::dependency_version` and `Document::dependencies` read module
+  dependencies with source spans.
+- `Document::members` and `Document::member_entries` read workspace members.
+- `Document::string_field`, `Document::field_span`, and `Document::find_string`
+  query top-level AST fields without matching comments or nested options.
+- `Document::replace_span`, `Document::apply_edits`, and `Document::replace_string`
+  perform lossless UTF-8 byte-span edits (`EditError` on invalid/overlapping spans).
+- `Document::diagnostics` and `Document::warnings` expose parser and validation
+  diagnostics with byte offsets into the original UTF-8 source.
+- BOM and CRLF input are preserved. `is_private` checks registry visibility
+  (`private = true` or legacy `options("private": true)`).
 
 ## Supported files and targets
 
 `Kind::Mod`, `Kind::Pkg`, and `Kind::Work` correspond to the three MoonBit
-manifest formats. The package targets native because it is intended for CLI,
-release, and workspace tooling.
+manifest formats. The library package has no async or OS dependency and checks
+across all MoonBit targets; the `cmd/moon-manifest` CLI uses
+`moonbitlang/core/async` and targets `native`.
 
 ## License
 

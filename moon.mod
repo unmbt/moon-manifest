@@ -15,6 +15,6 @@ description = "Lossless MoonBit manifest queries and edits"
 preferred_target = "native"
 
 import {
-  "moonbitlang/moon_config@0.4.5",
-  "moonbitlang/lexer@0.4.4",
+  "moonbitlang/moon_config@0.4.6",
+  "moonbitlang/lexer@0.4.5",
 }
