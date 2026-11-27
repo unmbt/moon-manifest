@@ -43,8 +43,12 @@ let edited_bytes = document.apply_edits([
 ])
 ```
 
-- `Document::dependency_version` and `Document::dependencies` read module
-  dependencies with source spans.
+- `Document::dependency`, `Document::dependency_version`, and
+  `Document::dependencies` read module dependencies with both full literal spans
+  (`span`) and version-only spans (`version_span`).
+- `Document::dependency_version_edit`, `Document::replace_dependency_version`,
+  and `Document::replace_dependency_versions` update dependency versions in
+  `moon.mod` losslessly while preserving comments, whitespace, BOM, and CRLF.
 - `Document::members` and `Document::member_entries` read workspace members.
 - `Document::string_field`, `Document::field_span`, and `Document::find_string`
   query top-level AST fields without matching comments or nested options.

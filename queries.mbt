@@ -12,6 +12,7 @@ pub struct Dependency {
   name : String
   version : String
   span : Span
+  version_span : Span
 }
 
 ///|
@@ -116,7 +117,49 @@ pub fn Document::is_private(self : Document) -> Bool {
 }
 
 ///|
-/// Import literal spans include the name, version, and surrounding quotes.
+fn find_unescaped_at(source : Bytes, start : Int32, end : Int32) -> Int32? {
+  let mut result : Int32? = None
+  let mut index = start
+  let mut escaped = false
+  while index < end {
+    if escaped {
+      escaped = false
+    } else if source[index] == b'\\' {
+      escaped = true
+    } else if source[index] == b'@' {
+      result = Some(index)
+    }
+    index += 1
+  }
+  result
+}
+
+///|
+fn Document::dependency_version_span(
+  self : Document,
+  literal_span : Span,
+) -> Span {
+  if literal_span.start + 2 <= literal_span.end &&
+    literal_span.end <= self.source.length() &&
+    self.source[literal_span.start] == b'"' &&
+    self.source[literal_span.end - 1] == b'"' {
+    match
+      find_unescaped_at(
+        self.source,
+        literal_span.start + 1,
+        literal_span.end - 1,
+      ) {
+      Some(at) => { start: at + 1, end: literal_span.end - 1, }
+      None => literal_span
+    }
+  } else {
+    literal_span
+  }
+}
+
+///|
+/// Import literal spans include the name, version, and surrounding quotes;
+/// `version_span` locates the version substring after `@` inside the literal.
 pub fn Document::dependencies(self : Document) -> Array[Dependency] {
   let result = []
   for statement in self.ast.0 {
@@ -124,7 +167,9 @@ pub fn Document::dependencies(self : Document) -> Array[Dependency] {
       for item in items {
         if item.alias_ is None &&
           parse_dep_spec(item.path) is Some((name, version)) {
-          result.push({ name, version, span: self.loc_to_span(item.path_loc), })
+          let span = self.loc_to_span(item.path_loc)
+          let version_span = self.dependency_version_span(span)
+          result.push({ name, version, span, version_span, })
         }
       }
     }
@@ -133,16 +178,22 @@ pub fn Document::dependencies(self : Document) -> Array[Dependency] {
 }
 
 ///|
+/// Find a declared module dependency by name.
+pub fn Document::dependency(self : Document, name : String) -> Dependency? {
+  for dep in self.dependencies() {
+    if dep.name == name {
+      return Some(dep)
+    }
+  }
+  None
+}
+
+///|
 pub fn Document::dependency_version(
   self : Document,
   dependency : String,
 ) -> String? {
-  for dep in self.dependencies() {
-    if dep.name == dependency {
-      return Some(dep.version)
-    }
-  }
-  None
+  self.dependency(dependency).map(dep => dep.version)
 }
 
 ///|
@@ -189,7 +240,7 @@ fn Document::validate(self : Document) -> Unit {
                 })
               }
               Some((name, _)) =>
-                if !seen_deps.add_and_check(name) {
+                if !seen_deps.insert_and_check(name) {
                   let span = self.loc_to_span(item.path_loc)
                   self.diagnostics.push({
                     message: "Duplicate dependency `\{name}`",

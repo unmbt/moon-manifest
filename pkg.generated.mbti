@@ -13,6 +13,8 @@ pub fn parse(Kind, String, path? : String) -> Document
 pub(all) suberror EditError {
   OutOfBounds(span~ : Span, source_len~ : Int32)
   OverlappingSpans(first~ : Span, second~ : Span)
+  DependencyNotFound(name~ : String)
+  InvalidDependencyVersion(name~ : String, version~ : String)
 }
 
 // Types and methods
@@ -21,6 +23,7 @@ pub struct Dependency {
   name : String
   version : String
   span : Span
+  version_span : Span
 }
 
 #derive(Eq, @debug.Debug)
@@ -41,13 +44,17 @@ pub struct Document {
 }
 pub fn Document::apply_edits(Self, ArrayView[TextEdit]) -> Bytes raise EditError
 pub fn Document::dependencies(Self) -> Array[Dependency]
+pub fn Document::dependency(Self, String) -> Dependency?
 pub fn Document::dependency_version(Self, String) -> String?
+pub fn Document::dependency_version_edit(Self, String, String) -> TextEdit raise EditError
 pub fn Document::field_span(Self, String) -> Span?
 pub fn Document::find_string(Self, String) -> Span?
 pub fn Document::is_private(Self) -> Bool
 pub fn Document::member_entries(Self) -> Array[LocatedString]
 pub fn Document::members(Self) -> Array[String]
 pub fn Document::module_name(Self) -> String?
+pub fn Document::replace_dependency_version(Self, String, String) -> Bytes raise EditError
+pub fn Document::replace_dependency_versions(Self, ArrayView[(String, String)]) -> Bytes raise EditError
 pub fn Document::replace_span(Self, Span, String) -> Bytes raise EditError
 pub fn Document::replace_string(Self, String, String) -> String
 pub fn Document::string_field(Self, String) -> LocatedString?

@@ -53,3 +53,60 @@ test "apply_edits rejects overlapping spans" {
     _ => fail("expected OverlappingSpans")
   }
 }
+
+///|
+test "replace_dependency_version and replace_dependency_versions preserve formatting" {
+  let source = "\uFEFF// 中文 😀\r\nname = \"acme/app\"\r\nimport {\r\n  \"acme/a@0.1.0\", // keep comment\r\n  \"acme/b@1.2.3\",\r\n}\r\nother = \"acme/a@0.1.0\""
+  let doc = @moon-manifest.parse(Mod, source)
+  let single = doc.replace_dependency_version("acme/a", "0.2.0")
+  assert_eq(
+    @utf8.decode_lossy(single),
+    "\uFEFF// 中文 😀\r\nname = \"acme/app\"\r\nimport {\r\n  \"acme/a@0.2.0\", // keep comment\r\n  \"acme/b@1.2.3\",\r\n}\r\nother = \"acme/a@0.1.0\"",
+  )
+  let batch = doc.replace_dependency_versions([
+    ("acme/b", "2.0.0-rc.1+build.4"),
+    ("acme/a", "0.2.1"),
+  ])
+  assert_eq(
+    @utf8.decode_lossy(batch),
+    "\uFEFF// 中文 😀\r\nname = \"acme/app\"\r\nimport {\r\n  \"acme/a@0.2.1\", // keep comment\r\n  \"acme/b@2.0.0-rc.1+build.4\",\r\n}\r\nother = \"acme/a@0.1.0\"",
+  )
+  assert_eq(doc.replace_dependency_versions([]), doc.source)
+}
+
+///|
+test "replace_dependency_versions reports missing, invalid, and duplicate updates" {
+  let doc = @moon-manifest.parse(
+    Mod,
+    "name = \"acme/app\"\nimport { \"acme/a@0.1.0\" }\n",
+  )
+  try doc.replace_dependency_version("acme/missing", "0.2.0") catch {
+    err =>
+      debug_inspect(
+        err,
+        content=(
+          #|DependencyNotFound(name="acme/missing")
+        ),
+      )
+  } noraise {
+    _ => fail("expected DependencyNotFound")
+  }
+  try doc.replace_dependency_version("acme/a", "") catch {
+    err =>
+      debug_inspect(
+        err,
+        content=(
+          #|InvalidDependencyVersion(name="acme/a", version="")
+        ),
+      )
+  } noraise {
+    _ => fail("expected InvalidDependencyVersion")
+  }
+  try
+    doc.replace_dependency_versions([("acme/a", "0.2.0"), ("acme/a", "0.3.0")])
+  catch {
+    err => assert_true(err is OverlappingSpans(..))
+  } noraise {
+    _ => fail("expected OverlappingSpans")
+  }
+}

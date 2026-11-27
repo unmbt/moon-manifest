@@ -18,6 +18,12 @@ test "located imports and fields preserve Unicode and CRLF" {
     @utf8.decode_lossy(doc.source[dep.span.start:dep.span.end]),
     "\"acme/lib@0.2.0\"",
   )
+  assert_eq(
+    @utf8.decode_lossy(doc.source[dep.version_span.start:dep.version_span.end]),
+    "0.2.0",
+  )
+  assert_eq(doc.dependency("acme/lib"), Some(dep))
+  assert_eq(doc.dependency("acme/missing"), None)
   assert_eq(@utf8.decode_lossy(doc.source), source)
 }
 
