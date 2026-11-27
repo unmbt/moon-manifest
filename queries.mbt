@@ -15,35 +15,82 @@ pub struct Dependency {
 }
 
 ///|
-fn Document::span(self : Document, value : @moon_config.Ast) -> Span {
-  let source = @utf8.decode_lossy(self.source)
-  let loc = value.loc()
+fn Document::loc_to_span(self : Document, loc : @basic.Location) -> Span {
   {
-    start: position_to_byte(source, loc.start),
-    end: position_to_byte(source, loc.end),
+    start: position_to_byte(self.char_byte_offsets, loc.start),
+    end: position_to_byte(self.char_byte_offsets, loc.end),
+  }
+}
+
+///|
+fn Document::span(self : Document, value : @moon_config.Expr) -> Span {
+  self.loc_to_span(value.loc())
+}
+
+///|
+fn Document::assign_field(self : Document, key : String) -> @moon_config.Field? {
+  for statement in self.ast.0 {
+    if statement is Assign(field) && field.key == key {
+      return Some(field)
+    }
+  }
+  None
+}
+
+///|
+fn parse_dep_spec(spec : String) -> (String, String)? {
+  match spec.rev_find("@") {
+    Some(i) if i > 0 => {
+      let name = spec.exact_view(end=i).to_owned()
+      let version = spec.exact_view(start=i + 1).to_owned()
+      if version.is_empty() {
+        None
+      } else {
+        Some((name, version))
+      }
+    }
+    _ => None
   }
 }
 
 ///|
 /// Query a top-level string field, never a nested field with the same name.
 pub fn Document::string_field(self : Document, key : String) -> LocatedString? {
-  for (name, value) in fields(self.ast) {
-    if name == key && value is @moon_config.Str(text, ..) {
-      return Some({ value: text, span: self.span(value), })
-    }
+  match self.assign_field(key) {
+    Some({ value: String(str~, loc~), .. }) =>
+      Some({ value: str, span: self.loc_to_span(loc), })
+    _ => None
   }
-  None
+}
+
+///|
+pub fn Document::field_span(self : Document, key : String) -> Span? {
+  self.assign_field(key).map(field => self.span(field.value))
+}
+
+///|
+/// Find a top-level string field span without matching comments or nested options.
+pub fn Document::find_string(self : Document, key : String) -> Span? {
+  self.string_field(key).map(entry => entry.span)
+}
+
+///|
+pub fn Document::module_name(self : Document) -> String? {
+  self.string_field("name").map(entry => entry.value)
+}
+
+///|
+pub fn Document::version(self : Document) -> String? {
+  self.string_field("version").map(entry => entry.value)
 }
 
 ///|
 pub fn Document::member_entries(self : Document) -> Array[LocatedString] {
   let result = []
-  for (key, value) in fields(self.ast) {
-    if key == "members" && value is @moon_config.Arr(items, ..) {
-      for item in items {
-        if item is @moon_config.Str(text, ..) {
-          result.push({ value: text, span: self.span(item), })
-        }
+  if self.assign_field("members") is Some({ value: Array(items~, ..), .. }) {
+    for item in items {
+      if item is String(str~, loc~) {
+        result.push({ value: str, span: self.loc_to_span(loc), })
       }
     }
   }
@@ -51,35 +98,33 @@ pub fn Document::member_entries(self : Document) -> Array[LocatedString] {
 }
 
 ///|
-/// A MoonBit private module requests restricted registry visibility.
-pub fn Document::is_private(self : Document) -> Bool {
-  for (key, value) in fields(self.ast) {
-    if key == "private" && value is @moon_config.Bool(flag, ..) {
-      return flag
-    }
-  }
-  false
+pub fn Document::members(self : Document) -> Array[String] {
+  self.member_entries().map(entry => entry.value)
 }
 
 ///|
-pub fn Document::field_span(self : Document, key : String) -> Span? {
-  for (name, value) in fields(self.ast) {
-    if name == key {
-      return Some(self.span(value))
-    }
+/// A MoonBit private module requests restricted registry visibility.
+pub fn Document::is_private(self : Document) -> Bool {
+  match self.assign_field("private") {
+    Some({ value: Bool(value~, ..), .. }) => value
+    _ =>
+      match @moon_config.find_field_in_options(self.ast, "private") {
+        Some(Bool(value~, ..)) => value
+        _ => false
+      }
   }
-  None
 }
 
 ///|
 /// Import literal spans include the name, version, and surrounding quotes.
 pub fn Document::dependencies(self : Document) -> Array[Dependency] {
   let result = []
-  for (key, value) in fields(self.ast) {
-    if key == "deps" {
-      for (name, item) in fields(value) {
-        if item is @moon_config.Str(version, ..) {
-          result.push({ name, version, span: self.span(item), })
+  for statement in self.ast.0 {
+    if statement is Import(items~, kind=Normal, conditions=[], ..) {
+      for item in items {
+        if item.alias_ is None &&
+          parse_dep_spec(item.path) is Some((name, version)) {
+          result.push({ name, version, span: self.loc_to_span(item.path_loc), })
         }
       }
     }
@@ -88,69 +133,74 @@ pub fn Document::dependencies(self : Document) -> Array[Dependency] {
 }
 
 ///|
-fn validate_imports(
-  input : String,
-  source : String,
-  path : String,
-) -> Array[Diagnostic] {
-  let (raw, _) = @moon_config.parse_moon_pkg(input, name=path)
-  let diagnostics = []
-  let seen : Map[String, Bool] = Map([])
-  for (key, value) in fields(raw) {
-    if key == "import" || key == "test-import" || key == "wbtest-import" {
-      if value is @moon_config.Arr(items, ..) {
-        for item in items {
-          let message = match item {
-            @moon_config.Str(spec, ..) if key == "import" => {
-              let name = match spec.rev_find("@") {
-                Some(i) if i > 0 => spec[:i].to_owned()
-                _ => spec
-              }
-              if seen.contains(name) {
-                "Duplicate dependency `\{name}`"
-              } else {
-                seen[name] = true
-                ""
-              }
-            }
-            _ =>
-              "Unsupported module import: expected a plain module@version string"
-          }
-          if message != "" {
-            let loc = item.loc()
-            diagnostics.push({
-              message,
-              start: position_to_byte(source, loc.start),
-              end: position_to_byte(source, loc.end),
-            })
-          }
-        }
-      }
+pub fn Document::dependency_version(
+  self : Document,
+  dependency : String,
+) -> String? {
+  for dep in self.dependencies() {
+    if dep.name == dependency {
+      return Some(dep.version)
     }
   }
-  diagnostics
+  None
 }
 
 ///|
-fn Document::validate_shapes(self : Document) -> Unit {
-  for (key, value) in fields(self.ast) {
-    let valid = match (self.kind, key) {
-      (Mod, "name" | "version" | "source") => value is @moon_config.Str(_, ..)
-      (Work, "members") =>
-        match value {
-          @moon_config.Arr(items, ..) =>
-            items.to_array().all(item => item is @moon_config.Str(_, ..))
-          _ => false
+fn Document::validate(self : Document) -> Unit {
+  let seen_deps : Set[String] = Set([])
+  for statement in self.ast.0 {
+    match statement {
+      Assign(field) => {
+        let valid = match (self.kind, field.key) {
+          (Mod, "name" | "version" | "source") => field.value is String(_, ..)
+          (Work, "members") =>
+            match field.value {
+              Array(items~, ..) => items.all(item => item is String(_, ..))
+              _ => false
+            }
+          _ => true
         }
-      _ => true
-    }
-    if !valid {
-      let span = self.span(value)
-      self.diagnostics.push({
-        message: "Invalid value type for `" + key + "`",
-        start: span.start,
-        end: span.end,
-      })
+        if !valid {
+          let span = self.span(field.value)
+          self.diagnostics.push({
+            message: "Invalid value type for `\{field.key}`",
+            start: span.start,
+            end: span.end,
+          })
+        }
+      }
+      Import(items~, kind=Normal, ..) if self.kind is Mod =>
+        for item in items {
+          if item.alias_ is Some(_) {
+            let span = self.loc_to_span(item.loc)
+            self.diagnostics.push({
+              message: "Unsupported module import: expected a plain module@version string",
+              start: span.start,
+              end: span.end,
+            })
+          } else {
+            match parse_dep_spec(item.path) {
+              None => {
+                let span = self.loc_to_span(item.path_loc)
+                self.diagnostics.push({
+                  message: "Invalid module import `\{item.path}`: expected a plain module@version string",
+                  start: span.start,
+                  end: span.end,
+                })
+              }
+              Some((name, _)) =>
+                if !seen_deps.add_and_check(name) {
+                  let span = self.loc_to_span(item.path_loc)
+                  self.diagnostics.push({
+                    message: "Duplicate dependency `\{name}`",
+                    start: span.start,
+                    end: span.end,
+                  })
+                }
+            }
+          }
+        }
+      _ => ()
     }
   }
 }

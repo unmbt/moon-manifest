@@ -20,11 +20,18 @@ test "official workspace members are read" {
 }
 
 ///|
-test "commented and string occurrences are ignored" {
-  let source = "// version = \"bad\"\nname = \"version = bad\"\nversion = \"1\"\n"
+test "commented, string, and nested option occurrences are ignored" {
+  let source = "// version = \"bad\"\nname = \"version = bad\"\noptions(\"version\": \"nested\")\nversion = \"1\"\n"
   let document = @moon-manifest.parse(Mod, source)
   assert_eq(
     document.replace_string("version", "2"),
-    "// version = \"bad\"\nname = \"version = bad\"\nversion = \"2\"\n",
+    "// version = \"bad\"\nname = \"version = bad\"\noptions(\"version\": \"nested\")\nversion = \"2\"\n",
   )
+}
+
+///|
+test "default path matches manifest kind" {
+  assert_eq(@moon-manifest.parse(Mod, "").path, "moon.mod")
+  assert_eq(@moon-manifest.parse(Pkg, "").path, "moon.pkg")
+  assert_eq(@moon-manifest.parse(Work, "").path, "moon.work")
 }
