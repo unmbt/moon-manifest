@@ -164,3 +164,60 @@ test "wrong scalar and member types cannot disappear from read models" {
     ),
   )
 }
+
+///|
+test "options scripts are queried with spans and validated" {
+  let source =
+    #|name = "acme/test"
+    #|version = "0.1.0"
+    #|options(
+    #|  scripts: {
+    #|    "preversion": "echo \"pre\"",
+    #|    "version": "moon test",
+    #|    "postversion": "echo done",
+    #|  },
+    #|)
+  let doc = @moon-manifest.parse(Mod, source)
+  assert_eq(doc.diagnostics.length(), 0)
+  assert_eq(doc.script("preversion"), Some("echo \"pre\""))
+  assert_eq(doc.script("version"), Some("moon test"))
+  assert_eq(doc.script("postversion"), Some("echo done"))
+  assert_eq(doc.script("missing"), None)
+  let entries = doc.script_entries()
+  assert_eq(entries.length(), 3)
+  let (_, version_entry) = entries[1]
+  assert_eq(
+    @utf8.decode_lossy(
+      doc.source[version_entry.span.start:version_entry.span.end],
+    ),
+    "\"moon test\"",
+  )
+
+  let bad_entry = @moon-manifest.parse(
+    Mod,
+    "name = \"acme/test\"\noptions(scripts: { \"version\": 42 })\n",
+  )
+  assert_eq(bad_entry.diagnostics.length(), 1)
+  assert_eq(
+    bad_entry.diagnostics[0].message,
+    "Invalid value type for script `version`",
+  )
+
+  let bad_map = @moon-manifest.parse(
+    Mod,
+    "name = \"acme/test\"\noptions(scripts: \"not-a-map\")\n",
+  )
+  assert_eq(bad_map.diagnostics.length(), 1)
+  assert_eq(bad_map.diagnostics[0].message, "Invalid value type for `scripts`")
+}
+
+///|
+test "relative path module imports are accepted without diagnostics" {
+  let doc = @moon-manifest.parse(
+    Mod,
+    "name = \"acme/test\"\nversion = \"0.1.0\"\nimport { \"../moon-manifest\", \"./local\", \"acme/lib@0.1.0\" }\n",
+  )
+  assert_eq(doc.diagnostics.length(), 0)
+  assert_eq(doc.dependencies().length(), 1)
+  assert_eq(doc.dependency_version("acme/lib"), Some("0.1.0"))
+}

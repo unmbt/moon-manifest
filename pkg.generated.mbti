@@ -57,6 +57,9 @@ pub fn Document::replace_dependency_version(Self, String, String) -> Bytes raise
 pub fn Document::replace_dependency_versions(Self, ArrayView[(String, String)]) -> Bytes raise EditError
 pub fn Document::replace_span(Self, Span, String) -> Bytes raise EditError
 pub fn Document::replace_string(Self, String, String) -> String
+pub fn Document::script(Self, String) -> String?
+pub fn Document::script_entries(Self) -> Array[(String, LocatedString)]
+pub fn Document::scripts(Self) -> Map[String, String]
 pub fn Document::string_field(Self, String) -> LocatedString?
 pub fn Document::version(Self) -> String?
 

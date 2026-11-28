@@ -50,6 +50,8 @@ let edited_bytes = document.apply_edits([
   and `Document::replace_dependency_versions` update dependency versions in
   `moon.mod` losslessly while preserving comments, whitespace, BOM, and CRLF.
 - `Document::members` and `Document::member_entries` read workspace members.
+- `Document::scripts`, `Document::script`, and `Document::script_entries` read
+  `options(scripts: { ... })` entries with value spans and validate string values.
 - `Document::string_field`, `Document::field_span`, and `Document::find_string`
   query top-level AST fields without matching comments or nested options.
 - `Document::replace_span`, `Document::apply_edits`, and `Document::replace_string`
